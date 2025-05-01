@@ -1,7 +1,10 @@
 <script lang="ts">
-	import '../app.css';
-	
-	let { children } = $props();
+    import "../app.css";
+    import "@fontsource/rubik";
+
+    let { children } = $props();
 </script>
 
-{@render children()}
+<div class="min-h-screen bg-bgcolor font-['Rubik']">
+    {@render children()}
+</div>

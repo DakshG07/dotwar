@@ -26,5 +26,10 @@
 		"onlyBuiltDependencies": [
 			"esbuild"
 		]
+	},
+	"dependencies": {
+		"@fontsource/rubik": "^5.2.5",
+		"fontsource": "0.0.1-security",
+		"intrinsic-scale": "^5.0.0"
 	}
 }

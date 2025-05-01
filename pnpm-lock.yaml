@@ -7,6 +7,16 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@fontsource/rubik':
+        specifier: ^5.2.5
+        version: 5.2.5
+      fontsource:
+        specifier: 0.0.1-security
+        version: 0.0.1-security
+      intrinsic-scale:
+        specifier: ^5.0.0
+        version: 5.0.0
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^6.0.0
@@ -191,6 +201,9 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource/rubik@5.2.5':
+    resolution: {integrity: sha512-vr7hwIRJfK+OGi8+pEcNdLCzMoOAxfHPOmfDfZ63mDzG1/OUSeTLWiAtYywKCwPluTcV84hY2CHBUBF+OpKEcw==}
 
   '@jridgewell/gen-mapping@0.3.8':
     resolution: {integrity: sha512-imAbBGkb+ebQyxKgzv5Hu2nmROxoDOXHh80evxdoXNOrvAnVx7zimzc1Oo5h9RlfV4vPXaE2iM5pOFbvOCClWA==}
@@ -511,6 +524,9 @@ packages:
       picomatch:
         optional: true
 
+  fontsource@0.0.1-security:
+    resolution: {integrity: sha512-1o+kgq7OFuqhKDuZT7j3frhqpUPbLYyOB7mRSlAyvlLr7tj0ZCmyhCYZYoc+Prpl/DxiORCxIXD3M1m0kdUJSA==}
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -521,6 +537,10 @@ packages:
 
   import-meta-resolve@4.1.0:
     resolution: {integrity: sha512-I6fiaX09Xivtk+THaMfAwnA3MVA5Big1WHF1Dfx9hFuvNIWpXnorlkzhcQf6ehrqQiiZECRt1poOAkPmer3ruw==}
+
+  intrinsic-scale@5.0.0:
+    resolution: {integrity: sha512-NJY7170uG8gYkaGGV0ddakq5VAWSvM2FKhARgXj8OQwod1hQFRBWCXn7dk35bGd+vsRYYnJQw/Qpebk8MWp4dg==}
+    engines: {node: '>=20'}
 
   is-reference@3.0.3:
     resolution: {integrity: sha512-ixkJoqQvAP88E6wLydLGGqCJsrFUnqoH6HnaczB8XmDH1oaWU+xxdptvikTgaEhtZ53Ky6YXiBuUI2WXLMCwjw==}
@@ -819,6 +839,8 @@ snapshots:
   '@esbuild/win32-x64@0.25.3':
     optional: true
 
+  '@fontsource/rubik@5.2.5': {}
+
   '@jridgewell/gen-mapping@0.3.8':
     dependencies:
       '@jridgewell/set-array': 1.2.1
@@ -1082,12 +1104,16 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.2
 
+  fontsource@0.0.1-security: {}
+
   fsevents@2.3.3:
     optional: true
 
   graceful-fs@4.2.11: {}
 
   import-meta-resolve@4.1.0: {}
+
+  intrinsic-scale@5.0.0: {}
 
   is-reference@3.0.3:
     dependencies:
