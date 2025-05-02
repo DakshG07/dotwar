@@ -30,6 +30,20 @@
         }
     }
 
+    function newCell(
+        cell: { type: "red" | "blue"; points: number } | { type: "empty" },
+    ): Cell {
+        if (cell.type === "empty") {
+            return { type: "empty" };
+        }
+        return {
+            type: cell.type,
+            points: new Points(cell.points),
+            opacity: new Property(1),
+            offset: new Property(5),
+        };
+    }
+
     let canvas: HTMLCanvasElement;
     let ctx: CanvasRenderingContext2D;
     let scale: number = 1;
@@ -47,6 +61,8 @@
         | { type: "red"; points: Points; opacity: Property; offset: Property }
         | { type: "blue"; points: Points; opacity: Property; offset: Property };
     let grid: Cell[][] = $state([]);
+    let next: "red" | "blue" = "blue";
+    let turn: "red" | "blue" | "wait" = $state("red");
     let redScore: number = $derived.by(() =>
         grid.reduce(
             (acc, row) =>
@@ -123,16 +139,29 @@
             for (let row = 0; row < GRID_SIZE; row++) {
                 for (let col = 0; col < GRID_SIZE; col++) {
                     let cell = grid[row][col];
-                    if (cell.type === "empty") continue;
+                    if (cell.type !== turn) continue;
                     let tlx = col * CELL_SIZE + BORDER_SIZE;
                     let tly = row * CELL_SIZE + BORDER_SIZE;
                     let brx = tlx + CELL_SIZE - BORDER_SIZE;
                     let bry = tly + CELL_SIZE - BORDER_SIZE;
                     // Check if mouse in bounds
                     if (x >= tlx && x <= brx && y >= tly && y <= bry) {
+                        turn = "wait";
                         cell.points.target++;
                         if (cell.points.target === 4) {
                             setTimeout(solveGrid, 300);
+                        } else {
+                            setTimeout(() => {
+                                turn = next;
+                                switch (turn) {
+                                    case "red":
+                                        next = "blue";
+                                        break;
+                                    case "blue":
+                                        next = "red";
+                                        break;
+                                }
+                            }, 300);
                         }
                         grid = [...grid];
                     }
@@ -149,37 +178,21 @@
     function resetGrid() {
         grid = Array(GRID_SIZE)
             .fill(0)
-            .map(() => Array(GRID_SIZE).fill({ type: "empty" }));
+            .map((_, i) => Array(GRID_SIZE).fill({ type: "empty" }));
         setTimeout(() => {
-            grid[4][3] = {
+            grid[2][2] = {
                 type: "blue",
                 points: new Points(3),
                 opacity: new Property(1),
                 offset: new Property(5),
             };
             setTimeout(() => {
-                grid[0][0] = {
+                grid[3][3] = {
                     type: "red",
                     points: new Points(3),
                     opacity: new Property(1),
                     offset: new Property(5),
                 };
-                setTimeout(() => {
-                    grid[0][1] = {
-                        type: "blue",
-                        points: new Points(3),
-                        opacity: new Property(1),
-                        offset: new Property(5),
-                    };
-                    setTimeout(() => {
-                        grid[4][4] = {
-                            type: "red",
-                            points: new Points(3),
-                            opacity: new Property(1),
-                            offset: new Property(5),
-                        };
-                    }, 200);
-                }, 200);
             }, 200);
         }, 200);
     }
@@ -217,7 +230,7 @@
                 // Check if mouse in bounds
                 if (x >= tlx && x <= brx && y >= tly && y <= bry) {
                     // update to hover position
-                    if (cell.offset.target !== 0)
+                    if (cell.type === turn && cell.offset.target !== 0)
                         cell.offset.target = event.buttons & 1 ? 2 : 8;
                 } else {
                     cell.offset.target = 5;
@@ -237,7 +250,7 @@
             };
         } else {
             cell.type = color;
-            cell.points.target += 1;
+            if (cell.points.target < 4) cell.points.target += 1;
         }
     }
 
@@ -296,35 +309,15 @@
 
     function solveGrid(i: number = 0) {
         console.log(i);
-        if (i >= 5) {
-            console.log("COMPLEX SOLVE DETECTED, SWITCHING TO QUICK SOLVE");
-            quickSolve(); // too much recursion, quickly solve board state
-            // reset to clean condition
-            grid.forEach((row) =>
-                row.forEach((cell) => {
-                    if (cell.type !== "empty") {
-                        cell.opacity.target = 1;
-                        cell.offset.target = 4;
-                    }
-                }),
-            );
-            return;
-        }
-        // Prevent visual bugs
-        grid.forEach((row) =>
-            row.forEach((cell) => {
-                if (cell.type !== "empty") {
-                    cell.opacity.target = 1; // prevent odd fading issues
-                    cell.offset.target = 4; // prevent things becoming WAY too large
-                    if (cell.points.target > 4) cell.points.target = 4;
-                }
-            }),
-        );
+        let solved = true;
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
                 let cell = grid[row][col];
                 if (cell.type === "empty") continue;
+                cell.opacity.target = 1; // prevent fading issues
+                cell.offset.target = 5; // prevent flying squares
                 if (cell.points.target < 4) continue;
+                solved = false;
                 // Explode cell
                 cell.points.target = 6;
                 cell.opacity.target = 0;
@@ -346,38 +339,24 @@
                     if (col < GRID_SIZE - 1) {
                         upgradeCell(row, col + 1, cell.type);
                     }
-                    setTimeout(() => solveGrid(i + 1), 400); // allows for chain reactions
                 }, 200);
                 grid = [...grid];
-                break;
             }
         }
-    }
-
-    function quickSolve() {
-        // literally do not care about animations anymore
-        for (let row = 0; row < GRID_SIZE; row++) {
-            for (let col = 0; col < GRID_SIZE; col++) {
-                let cell = grid[row][col];
-                if (cell.type === "empty") continue;
-                if (cell.points.target < 4) continue;
-                grid[row][col] = { type: "empty" };
-                // Set the neighbors
-                if (row > 0) {
-                    upgradeCell(row - 1, col, cell.type);
+        if (!solved)
+            setTimeout(() => solveGrid(i + 1), 500); // allows for chain reactions
+        else {
+            setTimeout(() => {
+                turn = next;
+                switch (turn) {
+                    case "red":
+                        next = "blue";
+                        break;
+                    case "blue":
+                        next = "red";
+                        break;
                 }
-                if (row < GRID_SIZE - 1) {
-                    upgradeCell(row + 1, col, cell.type);
-                }
-                if (col > 0) {
-                    upgradeCell(row, col - 1, cell.type);
-                }
-                if (col < GRID_SIZE - 1) {
-                    upgradeCell(row, col + 1, cell.type);
-                }
-                quickSolve();
-                break;
-            }
+            }, 300);
         }
     }
 
@@ -517,7 +496,7 @@
                     {
                         x: centerX + SPREAD_RADIUS * (cell.points.value - 3),
                         y: centerY + SPREAD_RADIUS * (cell.points.value - 3),
-                        opacity: 1,
+                        opacity: 5 - cell.points.value,
                     },
                     center,
                     angle,
@@ -528,7 +507,7 @@
                     {
                         x: centerX - SPREAD_RADIUS * (cell.points.value - 3),
                         y: centerY + SPREAD_RADIUS * (cell.points.value - 3),
-                        opacity: 1,
+                        opacity: 5 - cell.points.value,
                     },
                     center,
                     angle,
@@ -539,7 +518,7 @@
                     {
                         x: centerX + SPREAD_RADIUS * (cell.points.value - 3),
                         y: centerY - SPREAD_RADIUS * (cell.points.value - 3),
-                        opacity: 1,
+                        opacity: 5 - cell.points.value,
                     },
                     center,
                     angle,
@@ -550,7 +529,7 @@
                     {
                         x: centerX - SPREAD_RADIUS * (cell.points.value - 3),
                         y: centerY - SPREAD_RADIUS * (cell.points.value - 3),
-                        opacity: 1,
+                        opacity: 5 - cell.points.value,
                     },
                     center,
                     angle,
@@ -575,12 +554,16 @@
     </h1>
 
     <div class="flex justify-center gap-8 mb-8">
-        <div class="bg-red-400 rounded-xl p-4 shadow-md w-32 text-center">
+        <div
+            class={`bg-red-400 rounded-xl p-4 shadow-md w-32 h-28 text-center transition-all ease-out-expo outline-opacity-50 outline-red-200 ${turn === "red" ? "outline-4" : "outline-0"}`}
+        >
             <h2 class="text-lg font-semibold text-white mb-2">You</h2>
             <p class="text-3xl font-bold text-white">{redScore}</p>
         </div>
 
-        <div class="bg-blue-400 rounded-xl p-4 shadow-md w-32 text-center">
+        <div
+            class={`bg-blue-400 rounded-xl p-4 shadow-md w-32 h-28 text-center transition-all ease-out-expo outline-opacity-50 outline-blue-200 ${turn === "blue" ? "outline-4" : "outline-0"}`}
+        >
             <h2 class="text-lg font-semibold text-white mb-2">Them</h2>
             <p class="text-3xl font-bold text-white">{blueScore}</p>
         </div>
