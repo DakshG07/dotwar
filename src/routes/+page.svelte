@@ -139,31 +139,35 @@
             for (let row = 0; row < GRID_SIZE; row++) {
                 for (let col = 0; col < GRID_SIZE; col++) {
                     let cell = grid[row][col];
-                    if (cell.type !== turn) continue;
+                    if (
+                        !(cell.type === turn) &&
+                        (turn === "wait" ||
+                            !(
+                                cell.type === "empty" &&
+                                redScore + blueScore <= 1
+                            ))
+                    )
+                        continue;
                     let tlx = col * CELL_SIZE + BORDER_SIZE;
                     let tly = row * CELL_SIZE + BORDER_SIZE;
                     let brx = tlx + CELL_SIZE - BORDER_SIZE;
                     let bry = tly + CELL_SIZE - BORDER_SIZE;
                     // Check if mouse in bounds
                     if (x >= tlx && x <= brx && y >= tly && y <= bry) {
+                        if (cell.type === "empty") {
+                            grid[row][col] = newCell({ type: turn, points: 3 });
+                            nextTurn();
+                            break;
+                        }
                         turn = "wait";
                         cell.points.target++;
                         if (cell.points.target === 4) {
                             setTimeout(solveGrid, 300);
                         } else {
-                            setTimeout(() => {
-                                turn = next;
-                                switch (turn) {
-                                    case "red":
-                                        next = "blue";
-                                        break;
-                                    case "blue":
-                                        next = "red";
-                                        break;
-                                }
-                            }, 300);
+                            nextTurn();
                         }
                         grid = [...grid];
+                        break;
                     }
                 }
             }
@@ -179,22 +183,20 @@
         grid = Array(GRID_SIZE)
             .fill(0)
             .map((_, i) => Array(GRID_SIZE).fill({ type: "empty" }));
+    }
+
+    function nextTurn() {
         setTimeout(() => {
-            grid[2][2] = {
-                type: "blue",
-                points: new Points(3),
-                opacity: new Property(1),
-                offset: new Property(5),
-            };
-            setTimeout(() => {
-                grid[3][3] = {
-                    type: "red",
-                    points: new Points(3),
-                    opacity: new Property(1),
-                    offset: new Property(5),
-                };
-            }, 200);
-        }, 200);
+            turn = next;
+            switch (turn) {
+                case "red":
+                    next = "blue";
+                    break;
+                case "blue":
+                    next = "red";
+                    break;
+            }
+        }, 300);
     }
 
     function render() {
