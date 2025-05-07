@@ -3,6 +3,7 @@
     import resizeToFit from "intrinsic-scale";
     import { Animator } from "$lib/framework";
     import { easeOutExpo, rotPoint, hexSuffix } from "$lib/utils";
+    import { Player, Color } from "$lib/player";
 
     class Points extends Animator<number> {
         constructor(value: number) {
@@ -31,7 +32,7 @@
     }
 
     function newCell(
-        cell: { type: "red" | "blue"; points: number } | { type: "empty" },
+        cell: { type: Color; points: number } | { type: "empty" },
     ): Cell {
         if (cell.type === "empty") {
             return { type: "empty" };
@@ -47,65 +48,74 @@
     let canvas: HTMLCanvasElement;
     let ctx: CanvasRenderingContext2D;
     let scale: number = 1;
-    const GRID_SIZE = 5;
-    const CELL_SIZE = 100;
+    const GRID_SIZE = 7; // 5
+    const GRID_SCALE = 5 / GRID_SIZE;
+    const CELL_SIZE = GRID_SCALE * 100;
     const BORDER_SIZE = 12;
     const CORNER_RADIUS = 16;
-    const DOT_RADIUS = 6;
-    const SPREAD_RADIUS = 14;
-    type Cell =
-        | { type: "empty" }
-        | { type: "red"; points: Points; opacity: Property; offset: Property }
-        | { type: "blue"; points: Points; opacity: Property; offset: Property };
-    type ActiveCell =
-        | { type: "red"; points: Points; opacity: Property; offset: Property }
-        | { type: "blue"; points: Points; opacity: Property; offset: Property };
+    const DOT_RADIUS = GRID_SCALE * 6;
+    const SPREAD_RADIUS = GRID_SCALE * 14;
+    const NUM_PLAYERS = 4;
+    type ActiveCell = {
+        type: Color;
+        points: Points;
+        opacity: Property;
+        offset: Property;
+    };
+    type Cell = { type: "empty" } | ActiveCell;
     let grid: Cell[][] = $state([]);
-    let next: "red" | "blue" = "blue";
-    let turn: "red" | "blue" | "wait" = $state("red");
-    let redScore: number = $derived.by(() =>
-        grid.reduce(
-            (acc, row) =>
-                acc + row.filter((cell) => cell.type === "red").length,
-            0,
-        ),
-    );
-    let redActive: number = $derived.by(() =>
-        grid.reduce(
-            (acc, row) =>
-                acc +
-                row
-                    .filter((cell) => cell.type === "red")
-                    .map((cell) => {
-                        let pts = cell.points.target;
-                        return pts > 4 ? 4 : pts;
-                    })
-                    .reduce((acc, pts) => acc + pts, 0),
-            0,
-        ),
-    );
-    let blueScore: number = $derived.by(() =>
-        grid.reduce(
-            (acc, row) =>
-                acc + row.filter((cell) => cell.type === "blue").length,
-            0,
-        ),
-    );
-    let blueActive: number = $derived.by(() =>
-        grid.reduce(
-            (acc, row) =>
-                acc +
-                row
-                    .filter((cell) => cell.type === "blue")
-                    .map((cell) => {
-                        let pts = cell.points.target;
-                        return pts > 4 ? 4 : pts;
-                    })
-                    .reduce((acc, pts) => acc + pts, 0),
-            0,
-        ),
-    );
+    let next: Color = new Color(1);
+    let turn: Color = $state(new Color(0));
+    let count = 0;
     let prevUpdate = performance.now();
+    let mouseX: number, mouseY: number;
+    const players: Player[] = $derived(
+        Array.from(
+            { length: NUM_PLAYERS },
+            (_, i) =>
+                new Player(
+                    i,
+                    grid.reduce(
+                        (acc, row) =>
+                            acc +
+                            row.filter(
+                                (cell) =>
+                                    cell.type !== "empty" &&
+                                    cell.type.index === i,
+                            ).length,
+                        0,
+                    ),
+                    grid.reduce(
+                        (acc, row) =>
+                            acc +
+                            row.reduce(
+                                (acc, cell) =>
+                                    acc +
+                                    (cell.type !== "empty" &&
+                                    cell.type.index === i
+                                        ? cell.points.target
+                                        : 0),
+                                0,
+                            ),
+                        0,
+                    ),
+                ),
+        ),
+    );
+    const activePlayers = $derived(
+        players.filter((player) => count < NUM_PLAYERS || player.score > 0),
+    );
+
+    $effect(() => {
+        if (turn.index >= 0)
+            canvas.dispatchEvent(
+                new MouseEvent("mousemove", {
+                    bubbles: true,
+                    clientX: mouseX,
+                    clientY: mouseY,
+                }),
+            );
+    });
 
     onMount(() => {
         resetGrid();
@@ -136,16 +146,18 @@
 
         canvas.addEventListener("click", (event) => {
             const { x, y } = getMousePos(event);
+            const current = turn;
+            turn = new Color(-1);
+            let clicked = false;
             for (let row = 0; row < GRID_SIZE; row++) {
                 for (let col = 0; col < GRID_SIZE; col++) {
                     let cell = grid[row][col];
+                    if (current.index < 0) continue;
+                    if (count > current.index && cell.type === "empty")
+                        continue;
                     if (
-                        !(cell.type === turn) &&
-                        (turn === "wait" ||
-                            !(
-                                cell.type === "empty" &&
-                                redScore + blueScore <= 1
-                            ))
+                        cell.type !== "empty" &&
+                        cell.type.index !== current.index
                     )
                         continue;
                     let tlx = col * CELL_SIZE + BORDER_SIZE;
@@ -154,12 +166,15 @@
                     let bry = tly + CELL_SIZE - BORDER_SIZE;
                     // Check if mouse in bounds
                     if (x >= tlx && x <= brx && y >= tly && y <= bry) {
+                        clicked = true;
                         if (cell.type === "empty") {
-                            grid[row][col] = newCell({ type: turn, points: 3 });
+                            grid[row][col] = newCell({
+                                type: current,
+                                points: 3,
+                            });
                             nextTurn();
                             break;
                         }
-                        turn = "wait";
                         cell.points.target++;
                         if (cell.points.target === 4) {
                             setTimeout(solveGrid, 300);
@@ -171,6 +186,7 @@
                     }
                 }
             }
+            if (!clicked) turn = current;
         });
 
         // Start rendering
@@ -180,22 +196,19 @@
     let direction = 1;
 
     function resetGrid() {
-        grid = Array(GRID_SIZE)
-            .fill(0)
-            .map((_, i) => Array(GRID_SIZE).fill({ type: "empty" }));
+        grid = Array.from({ length: GRID_SIZE }, (_, i) =>
+            Array(GRID_SIZE).fill({ type: "empty" }),
+        );
     }
 
     function nextTurn() {
         setTimeout(() => {
-            turn = next;
-            switch (turn) {
-                case "red":
-                    next = "blue";
-                    break;
-                case "blue":
-                    next = "red";
-                    break;
-            }
+            do {
+                turn = next;
+                next = new Color((turn.index + 1) % NUM_PLAYERS);
+            } while (players[turn.index].score === 0 && count >= NUM_PLAYERS);
+            count++;
+            console.log(turn.index);
         }, 300);
     }
 
@@ -220,7 +233,7 @@
     }
 
     function handleMouse(event: MouseEvent) {
-        const { x, y } = getMousePos(event);
+        ({ x: mouseX, y: mouseY } = getMousePos(event));
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
                 let cell = grid[row][col];
@@ -230,9 +243,17 @@
                 let brx = tlx + CELL_SIZE - BORDER_SIZE;
                 let bry = tly + CELL_SIZE - BORDER_SIZE;
                 // Check if mouse in bounds
-                if (x >= tlx && x <= brx && y >= tly && y <= bry) {
+                if (
+                    mouseX >= tlx &&
+                    mouseX <= brx &&
+                    mouseY >= tly &&
+                    mouseY <= bry
+                ) {
                     // update to hover position
-                    if (cell.type === turn && cell.offset.target !== 0)
+                    if (
+                        cell.type.index === turn.index &&
+                        cell.offset.target !== 0
+                    )
                         cell.offset.target = event.buttons & 1 ? 2 : 8;
                 } else {
                     cell.offset.target = 5;
@@ -241,7 +262,7 @@
         }
     }
 
-    function upgradeCell(row: number, col: number, color: "red" | "blue") {
+    function upgradeCell(row: number, col: number, color: Color) {
         let cell = grid[row][col];
         if (cell.type === "empty") {
             grid[row][col] = {
@@ -348,17 +369,7 @@
         if (!solved)
             setTimeout(() => solveGrid(i + 1), 500); // allows for chain reactions
         else {
-            setTimeout(() => {
-                turn = next;
-                switch (turn) {
-                    case "red":
-                        next = "blue";
-                        break;
-                    case "blue":
-                        next = "red";
-                        break;
-                }
-            }, 300);
+            nextTurn();
         }
     }
 
@@ -379,26 +390,12 @@
     function drawSquare(x: number, y: number, size: number, cell: ActiveCell) {
         ctx.save();
         // Render shadow
-        switch (cell.type) {
-            case "red":
-                ctx.fillStyle = "#c92828" + hexSuffix(cell.opacity.value);
-                break;
-            case "blue":
-                ctx.fillStyle = "#2563eb" + hexSuffix(cell.opacity.value);
-                break;
-        }
+        ctx.fillStyle = cell.type.opacity(cell.opacity.value).shadow;
         ctx.beginPath();
         ctx.roundRect(x, y + 1.5, size, size, CORNER_RADIUS);
         ctx.fill();
         // Render square
-        switch (cell.type) {
-            case "red":
-                ctx.fillStyle = "#f87171" + hexSuffix(cell.opacity.value);
-                break;
-            case "blue":
-                ctx.fillStyle = "#60a5fa" + hexSuffix(cell.opacity.value);
-                break;
-        }
+        ctx.fillStyle = cell.type.opacity(cell.opacity.value).primary;
         ctx.beginPath();
         ctx.roundRect(x, y - cell.offset.value, size, size, CORNER_RADIUS);
         ctx.clip();
@@ -556,19 +553,17 @@
     </h1>
 
     <div class="flex justify-center gap-8 mb-8">
-        <div
-            class={`bg-red-400 rounded-xl p-4 shadow-md w-32 h-28 text-center transition-all ease-out-expo outline-opacity-50 outline-red-200 ${turn === "red" ? "outline-4" : "outline-0"}`}
-        >
-            <h2 class="text-lg font-semibold text-white mb-2">You</h2>
-            <p class="text-3xl font-bold text-white">{redScore}</p>
-        </div>
-
-        <div
-            class={`bg-blue-400 rounded-xl p-4 shadow-md w-32 h-28 text-center transition-all ease-out-expo outline-opacity-50 outline-blue-200 ${turn === "blue" ? "outline-4" : "outline-0"}`}
-        >
-            <h2 class="text-lg font-semibold text-white mb-2">Them</h2>
-            <p class="text-3xl font-bold text-white">{blueScore}</p>
-        </div>
+        {#each players as player}
+            <div
+                style="background-color: {player.color
+                    .primary}; outline-color: {player.color.opacity(0.5)
+                    .primary}"
+                class={`rounded-xl p-4 shadow-md w-32 h-28 text-center transition-all ease-out-expo ${turn.index === player.color.index ? "outline-4" : "outline-0"}`}
+            >
+                <h2 class="text-lg font-semibold text-white mb-2">You</h2>
+                <p class="text-3xl font-bold text-white">{player.score}</p>
+            </div>
+        {/each}
     </div>
 
     <div class="flex justify-center mb-8">
@@ -581,28 +576,29 @@
     </div>
 
     <div class="flex justify-center">
-        <div class="w-[512px] bg-red-400 rounded-full h-6 overflow-hidden">
+        <div class="w-[512px] bg-bgcolor rounded-full h-6 overflow-hidden">
             <div class="flex h-full">
-                <div
-                    class="bg-red-400 transition-all duration-500 ease-out-expo flex items-center justify-end pr-2"
-                    style="width: {redActive + blueActive <= 1
-                        ? '50'
-                        : (redActive / (redActive + blueActive)) * 100}%"
-                >
-                    <span class="text-white text-sm font-medium"
-                        >{redActive}</span
+                {#each activePlayers as player}
+                    <div
+                        class="transition-all duration-500 ease-out-expo flex items-center justify-center pr-2"
+                        style="background-color: {player.color
+                            .primary}; width: {players.reduce(
+                            (acc, p) => acc + p.score,
+                            0,
+                        ) < NUM_PLAYERS
+                            ? 100 / NUM_PLAYERS
+                            : (player.active /
+                                  players.reduce(
+                                      (acc, p) => acc + p.active,
+                                      0,
+                                  )) *
+                              100}%"
                     >
-                </div>
-                <div
-                    class="bg-blue-400 transition-all duration-500 ease-out-expo flex items-center justify-start pl-2"
-                    style="width: {redActive + blueActive <= 1
-                        ? '50'
-                        : (blueActive / (redActive + blueActive)) * 100}%"
-                >
-                    <span class="text-white text-sm font-medium"
-                        >{blueActive}</span
-                    >
-                </div>
+                        <span class="text-white text-sm font-medium"
+                            >{player.active}</span
+                        >
+                    </div>
+                {/each}
             </div>
         </div>
     </div>

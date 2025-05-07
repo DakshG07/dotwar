@@ -77,7 +77,7 @@ export class Animator<T> {
       this._finished = true;
       return;
     }
-    const progress = Math.min(1, (this._elapsed + deltaTime) / this._duration);
+    const progress = (this._elapsed + deltaTime) / this._duration;
     this._current = this.curve(this._prev, this._target, progress);
     this._elapsed += deltaTime;
   }
