@@ -1,7 +1,18 @@
 <script lang="ts">
-    import { goto } from "$app/navigation";
+    import { onNavigate } from "$app/navigation";
     import "../app.css";
     import "@fontsource/rubik";
+
+    onNavigate((navigation) => {
+        if (!document.startViewTransition) return;
+
+        return new Promise((resolve) => {
+            document.startViewTransition(async () => {
+                resolve();
+                await navigation.complete;
+            });
+        });
+    });
 
     let { children } = $props();
 </script>

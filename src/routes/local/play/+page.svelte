@@ -182,7 +182,6 @@
                         } else {
                             nextTurn();
                         }
-                        grid = [...grid];
                         break;
                     }
                 }
@@ -209,7 +208,7 @@
                 next = new Color((turn.index + 1) % NUM_PLAYERS);
             } while (players[turn.index].score === 0 && count >= NUM_PLAYERS);
             count++;
-            console.log(turn.index);
+            grid = [...grid];
         }, 300);
     }
 
@@ -332,7 +331,6 @@
     //$inspect(grid);
 
     function solveGrid(i: number = 0) {
-        console.log(i);
         let solved = true;
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
@@ -364,7 +362,6 @@
                         upgradeCell(row, col + 1, cell.type);
                     }
                 }, 200);
-                grid = [...grid];
             }
         }
         if (!solved)
@@ -573,7 +570,7 @@
         <div class="flex h-full">
             {#each activePlayers as player}
                 <div
-                    class="transition-all duration-500 ease-out-expo flex items-center justify-center pr-2"
+                    class="transition-all duration-500 ease-out-expo flex items-center justify-center pr-2 text-white text-sm font-medium"
                     style="background-color: {player.color
                         .primary}; width: {players.reduce(
                         (acc, p) => acc + p.score,
@@ -584,9 +581,7 @@
                               players.reduce((acc, p) => acc + p.active, 0)) *
                           100}%"
                 >
-                    <span class="text-white text-sm font-medium"
-                        >{player.active}</span
-                    >
+                    {player.active}
                 </div>
             {/each}
         </div>
