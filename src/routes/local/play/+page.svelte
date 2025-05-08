@@ -69,7 +69,7 @@
     let grid: Cell[][] = $state([]);
     let next: Color = new Color(1);
     let turn: Color = $state(new Color(0));
-    let count = 0;
+    let count = $state(0);
     let prevUpdate = performance.now();
     let mouseX: number, mouseY: number;
     const players: Player[] = $derived(
