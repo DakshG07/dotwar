@@ -5,6 +5,8 @@
     import { easeOutExpo, rotPoint, intoNum } from "$lib/utils";
     import { Player, Color } from "$lib/player";
     import { page } from "$app/state";
+    import { scale as scaleTransition } from "svelte/transition";
+    import { flip } from "svelte/animate";
 
     class Points extends Animator<number> {
         constructor(value: number) {
@@ -543,15 +545,21 @@
     }
 </script>
 
-<div class="flex justify-center gap-8 mb-8">
+<div class="flex justify-center gap-8 mb-8 transition-all">
     {#each players as player}
         <div
-            style="background-color: {player.color
-                .primary}; outline-color: {player.color.opacity(0.5).primary}"
-            class={`rounded-xl p-4 shadow-md w-32 h-28 text-center transition-all ease-out-expo ${turn.index === player.color.index ? "outline-4" : "outline-0"}`}
+            style="background-color: {player.active === 0 && count > NUM_PLAYERS
+                ? '#faf8f0'
+                : player.color.primary}; outline-color: {player.color.opacity(
+                0.5,
+            ).primary}; border-color: {player.color
+                .primary}; color: {player.active === 0 && count > NUM_PLAYERS
+                ? player.color.primary
+                : 'white'}"
+            class={`rounded-xl p-4 w-32 h-28 text-center transition-all duration-500 ease-out-expo ${player.active === 0 && count > NUM_PLAYERS ? "border-2" : "border-none shadow-md"} ${turn.index === player.color.index ? "outline-4" : "outline-0"}`}
         >
-            <h2 class="text-lg font-semibold text-white mb-2">You</h2>
-            <p class="text-3xl font-bold text-white">{player.score}</p>
+            <h2 class="text-lg font-semibold mb-2">{player.color.name}</h2>
+            <p class="text-3xl font-bold">{player.score}</p>
         </div>
     {/each}
 </div>
