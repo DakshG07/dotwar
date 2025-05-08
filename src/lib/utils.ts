@@ -46,3 +46,15 @@ export function hexSuffix(opacity: number): string {
     .padStart(2, "0");
   return `${hexOpacity}`;
 }
+
+/**
+ * Converts a string into a number, otherwise returning a default value.
+ *
+ * @param value - The string to convert.
+ * @param def - The default value to return if the string is not a valid number.
+ * @returns The converted number or the default value.
+ */
+export function intoNum(value: string, def: number): number {
+  const num = parseInt(value);
+  return isNaN(num) ? def : num;
+}

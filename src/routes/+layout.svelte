@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { goto } from "$app/navigation";
     import "../app.css";
     import "@fontsource/rubik";
 
@@ -6,5 +7,12 @@
 </script>
 
 <div class="min-h-screen bg-bgcolor font-['Rubik']">
-    {@render children()}
+    <div class="container mx-auto px-4 py-8">
+        <h1
+            class="text-4xl font-['Rubik'] font-black text-center text-primary mb-8"
+        >
+            <a href="/">Dot War</a>
+        </h1>
+        {@render children()}
+    </div>
 </div>
