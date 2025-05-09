@@ -5,8 +5,9 @@
     import { easeOutExpo, rotPoint, intoNum } from "$lib/utils";
     import { Player, Color } from "$lib/player";
     import { page } from "$app/state";
-    import { scale as scaleTransition } from "svelte/transition";
-    import { flip } from "svelte/animate";
+    import { fly, scale as scaleTransition } from "svelte/transition";
+    import Button from "$lib/components/Button.svelte";
+    import { goto } from "$app/navigation";
 
     class Points extends Animator<number> {
         constructor(value: number) {
@@ -72,6 +73,8 @@
     let count = $state(0);
     let prevUpdate = performance.now();
     let mouseX: number, mouseY: number;
+    let won = $state(false);
+    let showWinner = $state(false);
     const players: Player[] = $derived(
         Array.from(
             { length: NUM_PLAYERS },
@@ -120,6 +123,34 @@
             );
     });
 
+    $effect(() => {
+        console.log(
+            `COUNT: ${count}\nWON: ${won}\nACTIVE PLAYERS: ${activePlayers.length}\nTURN: ${turn.index}`,
+        );
+        if (
+            turn.index >= 0 &&
+            count > NUM_PLAYERS &&
+            !won &&
+            activePlayers.length === 1
+        ) {
+            console.log("ok");
+            setTimeout(() => {
+                won = true;
+                setTimeout(() => {
+                    showWinner = true;
+                }, 250);
+            }, 1000);
+        }
+    });
+
+    $effect(() => {
+        if (won) {
+            canvas.style.transform = "scale(0.75)";
+        } else {
+            canvas.style.transform = "scale(1)";
+        }
+    });
+
     onMount(() => {
         resetGrid();
         // Update scaling to render canvas in hd
@@ -148,6 +179,7 @@
         canvas.addEventListener("mouseup", handleMouse);
 
         canvas.addEventListener("click", (event) => {
+            if (won) return;
             const { x, y } = getMousePos(event);
             const current = turn;
             turn = new Color(-1);
@@ -196,6 +228,30 @@
     });
 
     let direction = 1;
+
+    function newGame() {
+        const CASCADE_DELAY = 50;
+        grid.forEach((row) =>
+            row.forEach((cell, i) => {
+                if (cell.type === "empty") return;
+                setTimeout(() => {
+                    cell.opacity.target = 0;
+                    cell.offset.target = 0;
+                }, CASCADE_DELAY * i);
+            }),
+        );
+        setTimeout(
+            () => {
+                resetGrid();
+                won = false;
+                showWinner = false;
+                count = 0;
+                turn = new Color(0);
+                next = new Color(1);
+            },
+            200 + CASCADE_DELAY * GRID_SIZE,
+        );
+    }
 
     function resetGrid() {
         grid = Array.from({ length: GRID_SIZE }, (_, i) =>
@@ -249,7 +305,8 @@
                     mouseX >= tlx &&
                     mouseX <= brx &&
                     mouseY >= tly &&
-                    mouseY <= bry
+                    mouseY <= bry &&
+                    !won
                 ) {
                     // update to hover position
                     if (
@@ -536,7 +593,7 @@
             );
         }
         points.forEach(({ x, y, opacity }) => {
-            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${cell.opacity.value * opacity})`;
             ctx.beginPath();
             ctx.arc(x, y, DOT_RADIUS, 0, Math.PI * 2);
             ctx.fill();
@@ -545,23 +602,43 @@
     }
 </script>
 
-<div class="flex justify-center gap-8 mb-8 transition-all">
-    {#each players as player}
+<div class="relative">
+    <div
+        class={`flex justify-center gap-8 mb-8 transition-all duration-300 ${won ? "opacity-0" : ""}`}
+    >
+        {#each players as player}
+            <div
+                style="background-color: {player.active === 0 &&
+                count > NUM_PLAYERS
+                    ? '#faf8f0'
+                    : player.color
+                          .primary}; outline-color: {player.color.opacity(0.5)
+                    .primary}; border-color: {player.color
+                    .primary}; color: {player.active === 0 &&
+                count > NUM_PLAYERS
+                    ? player.color.primary
+                    : 'white'}"
+                class={`rounded-xl p-4 w-32 h-28 text-center transition-all duration-500 ease-out-expo ${player.active === 0 && count > NUM_PLAYERS ? "border-2" : "border-none shadow-md"} ${turn.index === player.color.index ? "outline-4" : "outline-0"}`}
+            >
+                <h2 class="text-lg font-semibold mb-2">{player.color.name}</h2>
+                <p class="text-3xl font-bold">{player.score}</p>
+            </div>
+        {/each}
+    </div>
+    {#if showWinner}
         <div
-            style="background-color: {player.active === 0 && count > NUM_PLAYERS
-                ? '#faf8f0'
-                : player.color.primary}; outline-color: {player.color.opacity(
-                0.5,
-            ).primary}; border-color: {player.color
-                .primary}; color: {player.active === 0 && count > NUM_PLAYERS
-                ? player.color.primary
-                : 'white'}"
-            class={`rounded-xl p-4 w-32 h-28 text-center transition-all duration-500 ease-out-expo ${player.active === 0 && count > NUM_PLAYERS ? "border-2" : "border-none shadow-md"} ${turn.index === player.color.index ? "outline-4" : "outline-0"}`}
+            class="absolute inset-0 flex items-center justify-center"
+            transition:fly={{ duration: 300, y: 40 }}
         >
-            <h2 class="text-lg font-semibold mb-2">{player.color.name}</h2>
-            <p class="text-3xl font-bold">{player.score}</p>
+            <h1
+                class="text-5xl font-bold py-4 px-12 rounded-2xl shadow-lg"
+                style="background-color: {activePlayers[0].color
+                    .primary}; color: white;"
+            >
+                {activePlayers[0].color.name} wins!
+            </h1>
         </div>
-    {/each}
+    {/if}
 </div>
 
 <div class="flex justify-center mb-8">
@@ -569,29 +646,44 @@
         bind:this={canvas}
         width={GRID_SIZE * CELL_SIZE + BORDER_SIZE}
         height={GRID_SIZE * CELL_SIZE + BORDER_SIZE}
-        class="bg-white rounded-3xl shadow-xl w-[512px] h-[512px]"
+        class="bg-white rounded-3xl shadow-xl w-[512px] h-[512px] transition-transform duration-500 ease-out-expo"
     ></canvas>
 </div>
 
 <div class="flex justify-center">
-    <div class="w-[512px] bg-bgcolor rounded-full h-6 overflow-hidden">
-        <div class="flex h-full">
-            {#each activePlayers as player}
-                <div
-                    class="transition-all duration-500 ease-out-expo flex items-center justify-center pr-2 text-white text-sm font-medium"
-                    style="background-color: {player.color
-                        .primary}; width: {players.reduce(
-                        (acc, p) => acc + p.score,
-                        0,
-                    ) < NUM_PLAYERS
-                        ? 100 / NUM_PLAYERS
-                        : (player.active /
-                              players.reduce((acc, p) => acc + p.active, 0)) *
-                          100}%"
-                >
-                    {player.active}
-                </div>
-            {/each}
+    <div class="relative">
+        {#if won}
+            <div
+                class="absolute top-0 left-0 right-0 flex justify-center z-50"
+                transition:scaleTransition={{ duration: 300, start: 0.8 }}
+            >
+                <Button onclick={newGame}>Play Again</Button>
+            </div>
+        {/if}
+        <div
+            class={`w-[512px] bg-bgcolor rounded-full h-6 overflow-hidden transition-opacity duration-300 ${won ? "opacity-0" : ""}`}
+        >
+            <div class="flex h-full">
+                {#each activePlayers as player}
+                    <div
+                        class="transition-all duration-500 ease-out-expo flex items-center justify-center pr-2 text-white text-sm font-medium"
+                        style="background-color: {player.color
+                            .primary}; width: {players.reduce(
+                            (acc, p) => acc + p.score,
+                            0,
+                        ) < NUM_PLAYERS
+                            ? 100 / NUM_PLAYERS
+                            : (player.active /
+                                  players.reduce(
+                                      (acc, p) => acc + p.active,
+                                      0,
+                                  )) *
+                              100}%"
+                    >
+                        {player.active}
+                    </div>
+                {/each}
+            </div>
         </div>
     </div>
 </div>
