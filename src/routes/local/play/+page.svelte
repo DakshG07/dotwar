@@ -231,13 +231,16 @@
 
     function newGame() {
         const CASCADE_DELAY = 50;
-        grid.forEach((row) =>
-            row.forEach((cell, i) => {
+        grid.forEach((row, i) =>
+            row.forEach((cell, j) => {
                 if (cell.type === "empty") return;
-                setTimeout(() => {
-                    cell.opacity.target = 0;
-                    cell.offset.target = 0;
-                }, CASCADE_DELAY * i);
+                setTimeout(
+                    () => {
+                        cell.opacity.target = 0;
+                        cell.offset.target = 0;
+                    },
+                    CASCADE_DELAY * i + CASCADE_DELAY * j,
+                );
             }),
         );
         setTimeout(
@@ -249,7 +252,7 @@
                 turn = new Color(0);
                 next = new Color(1);
             },
-            200 + CASCADE_DELAY * GRID_SIZE,
+            200 + 2 * CASCADE_DELAY * GRID_SIZE,
         );
     }
 
