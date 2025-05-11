@@ -2,12 +2,13 @@
     import { onMount } from "svelte";
     import resizeToFit from "intrinsic-scale";
     import { Animator } from "$lib/framework";
-    import { easeOutExpo, rotPoint, intoNum } from "$lib/utils";
+    import { easeOutExpo, rotPoint, intoNum, hexSuffix } from "$lib/utils";
     import { Player, Color } from "$lib/player";
     import { page } from "$app/state";
     import { fly, scale as scaleTransition } from "svelte/transition";
     import Button from "$lib/components/Button.svelte";
     import { goto } from "$app/navigation";
+    import { on } from "svelte/events";
 
     class Points extends Animator<number> {
         constructor(value: number) {
@@ -22,10 +23,14 @@
     }
 
     class Property extends Animator<number> {
-        constructor(value: number) {
-            super(0, easeOutExpo);
+        constructor(value: number, instant: boolean = false) {
             // properties animate from 0 by default
-            this.target = value;
+            if (!instant) {
+                super(0, easeOutExpo);
+                this.target = value;
+            } else {
+                super(value, easeOutExpo);
+            }
         }
         get target(): number {
             return super.target;
@@ -39,7 +44,7 @@
         cell: { type: Color; points: number } | { type: "empty" },
     ): Cell {
         if (cell.type === "empty") {
-            return { type: "empty" };
+            return { type: "empty", opacity: new Property(1) };
         }
         return {
             type: cell.type,
@@ -66,7 +71,7 @@
         opacity: Property;
         offset: Property;
     };
-    type Cell = { type: "empty" } | ActiveCell;
+    type Cell = { type: "empty"; opacity: Property } | ActiveCell;
     let grid: Cell[][] = $state([]);
     let next: Color = new Color(NUM_PLAYERS - 2);
     let turn: Color = $state(new Color(NUM_PLAYERS - 1));
@@ -140,6 +145,13 @@
     });
 
     $effect(() => {
+        if (GRID_SIZE % 2 === 1 && count === NUM_PLAYERS)
+            grid[Math.floor(GRID_SIZE / 2)][
+                Math.floor(GRID_SIZE / 2)
+            ].opacity.target = 1; // open center after initial round
+    });
+
+    $effect(() => {
         if (won) {
             canvas.style.transform = "scale(0.75)";
         } else {
@@ -192,6 +204,7 @@
                         cell.type.index !== current.index
                     )
                         continue;
+                    if (cell.opacity.target === 0) continue;
                     let tlx = col * CELL_SIZE + BORDER_SIZE;
                     let tly = row * CELL_SIZE + BORDER_SIZE;
                     let brx = tlx + CELL_SIZE - BORDER_SIZE;
@@ -255,7 +268,15 @@
 
     function resetGrid() {
         grid = Array.from({ length: GRID_SIZE }, (_, i) =>
-            Array(GRID_SIZE).fill({ type: "empty" }),
+            Array.from({ length: GRID_SIZE }, (_, j) => {
+                if (
+                    GRID_SIZE % 2 === 1 &&
+                    i === Math.floor(GRID_SIZE / 2) &&
+                    j === Math.floor(GRID_SIZE / 2)
+                )
+                    return { type: "empty", opacity: new Property(0, true) };
+                return { type: "empty", opacity: new Property(1, true) };
+            }),
         );
     }
 
@@ -269,6 +290,7 @@
                 else if (count === NUM_PLAYERS - 2) {
                     // repeat turn
                     next = new Color(turn.index);
+                    // make center accessible
                 } else next = new Color(turn.index - 1); // reverse order
             } while (players[turn.index].score === 0 && count >= NUM_PLAYERS);
             count++;
@@ -355,8 +377,12 @@
                 const y = row * CELL_SIZE;
                 const padding = BORDER_SIZE / 2;
 
+                let opacity = hexSuffix(1);
+                if (grid[row][col].type === "empty")
+                    opacity = hexSuffix(grid[row][col].opacity.value);
+
                 // Draw cell shadow
-                ctx.fillStyle = "#8c7c69";
+                ctx.fillStyle = "#8c7c69" + opacity;
                 ctx.beginPath();
                 ctx.roundRect(
                     x + BORDER_SIZE,
@@ -367,7 +393,7 @@
                 );
 
                 // Draw cell highlight
-                ctx.fillStyle = "#c7b7a6";
+                ctx.fillStyle = "#c7b7a6" + opacity;
                 ctx.beginPath();
                 ctx.roundRect(
                     x + BORDER_SIZE,
@@ -379,7 +405,7 @@
 
                 ctx.fill();
                 // Draw main cell
-                ctx.fillStyle = "#bdac98";
+                ctx.fillStyle = "#bdac98" + opacity;
                 ctx.beginPath();
                 ctx.roundRect(
                     x + BORDER_SIZE,
@@ -410,7 +436,10 @@
                 cell.opacity.target = 0;
                 cell.offset.target = 0;
                 setTimeout(() => {
-                    grid[row][col] = { type: "empty" };
+                    grid[row][col] = {
+                        type: "empty",
+                        opacity: new Property(1),
+                    };
                 }, 200);
                 setTimeout(() => {
                     // Set the neighbors
