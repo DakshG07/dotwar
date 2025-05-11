@@ -7,8 +7,7 @@
     import { page } from "$app/state";
     import { fly, scale as scaleTransition } from "svelte/transition";
     import Button from "$lib/components/Button.svelte";
-    import { goto } from "$app/navigation";
-    import { on } from "svelte/events";
+    import { shared } from "$lib/state.svelte";
 
     class Points extends Animator<number> {
         constructor(value: number) {
@@ -126,6 +125,10 @@
                     clientY: mouseY,
                 }),
             );
+    });
+
+    $effect(() => {
+        if (turn.index >= 0) shared.titleColor = turn;
     });
 
     $effect(() => {
