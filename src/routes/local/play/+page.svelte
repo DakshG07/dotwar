@@ -68,8 +68,8 @@
     };
     type Cell = { type: "empty" } | ActiveCell;
     let grid: Cell[][] = $state([]);
-    let next: Color = new Color(1);
-    let turn: Color = $state(new Color(0));
+    let next: Color = new Color(NUM_PLAYERS - 2);
+    let turn: Color = $state(new Color(NUM_PLAYERS - 1));
     let count = $state(0);
     let prevUpdate = performance.now();
     let mouseX: number, mouseY: number;
@@ -124,16 +124,12 @@
     });
 
     $effect(() => {
-        console.log(
-            `COUNT: ${count}\nWON: ${won}\nACTIVE PLAYERS: ${activePlayers.length}\nTURN: ${turn.index}`,
-        );
         if (
             turn.index >= 0 &&
             count > NUM_PLAYERS &&
             !won &&
             activePlayers.length === 1
         ) {
-            console.log("ok");
             setTimeout(() => {
                 won = true;
                 setTimeout(() => {
@@ -187,8 +183,9 @@
             for (let row = 0; row < GRID_SIZE; row++) {
                 for (let col = 0; col < GRID_SIZE; col++) {
                     let cell = grid[row][col];
-                    if (current.index < 0) continue;
-                    if (count > current.index && cell.type === "empty")
+                    if (current.index < 0) continue; // waiting state
+                    if (count >= NUM_PLAYERS && cell.type === "empty")
+                        // dont click empty cells
                         continue;
                     if (
                         cell.type !== "empty" &&
@@ -266,7 +263,13 @@
         setTimeout(() => {
             do {
                 turn = next;
-                next = new Color((turn.index + 1) % NUM_PLAYERS);
+                if (count >= NUM_PLAYERS - 1)
+                    // regular turn order
+                    next = new Color((turn.index + 1) % NUM_PLAYERS);
+                else if (count === NUM_PLAYERS - 2) {
+                    // repeat turn
+                    next = new Color(turn.index);
+                } else next = new Color(turn.index - 1); // reverse order
             } while (players[turn.index].score === 0 && count >= NUM_PLAYERS);
             count++;
             grid = [...grid];
