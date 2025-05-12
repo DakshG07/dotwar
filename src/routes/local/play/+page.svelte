@@ -262,25 +262,44 @@
                 won = false;
                 showWinner = false;
                 count = 0;
-                turn = new Color(0);
-                next = new Color(1);
+                turn = new Color(NUM_PLAYERS - 1);
+                next = new Color(NUM_PLAYERS - 2);
             },
             200 + 2 * CASCADE_DELAY * GRID_SIZE,
         );
     }
 
     function resetGrid() {
-        grid = Array.from({ length: GRID_SIZE }, (_, i) =>
-            Array.from({ length: GRID_SIZE }, (_, j) => {
-                if (
-                    GRID_SIZE % 2 === 1 &&
-                    i === Math.floor(GRID_SIZE / 2) &&
-                    j === Math.floor(GRID_SIZE / 2)
-                )
-                    return { type: "empty", opacity: new Property(0, true) };
-                return { type: "empty", opacity: new Property(1, true) };
-            }),
-        );
+        if (grid.length === 0)
+            grid = Array.from({ length: GRID_SIZE }, (_, i) =>
+                Array.from({ length: GRID_SIZE }, (_, j) => {
+                    if (
+                        GRID_SIZE % 2 === 1 &&
+                        i === Math.floor(GRID_SIZE / 2) &&
+                        j === Math.floor(GRID_SIZE / 2)
+                    )
+                        return {
+                            type: "empty",
+                            opacity: new Property(0, true),
+                        };
+                    return { type: "empty", opacity: new Property(1, true) };
+                }),
+            );
+        else
+            grid.forEach((row, i) =>
+                row.forEach((_, j) => {
+                    grid[i][j] = {
+                        type: "empty",
+                        opacity: new Property(1, true),
+                    };
+                    if (
+                        GRID_SIZE % 2 === 1 &&
+                        i === Math.floor(GRID_SIZE / 2) &&
+                        j === Math.floor(GRID_SIZE / 2)
+                    )
+                        grid[i][j].opacity.target = 0;
+                }),
+            );
     }
 
     function nextTurn() {
