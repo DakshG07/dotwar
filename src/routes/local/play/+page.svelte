@@ -43,13 +43,13 @@
         cell: { type: Color; points: number } | { type: "empty" },
     ): Cell {
         if (cell.type === "empty") {
-            return { type: "empty", opacity: new Property(1) };
+            return { type: "empty", opacity: new Property(1, true) };
         }
         return {
             type: cell.type,
             points: new Points(cell.points),
             opacity: new Property(1),
-            offset: new Property(5),
+            offset: new Property(CELL_OFFSET),
         };
     }
 
@@ -63,6 +63,9 @@
     const CORNER_RADIUS = 16;
     const DOT_RADIUS = GRID_SCALE * 6;
     const SPREAD_RADIUS = GRID_SCALE * 14;
+    const CELL_OFFSET = 6.5;
+    const CELL_HOVER = 9;
+    const CELL_PRESSED = 3;
     let NUM_PLAYERS = intoNum(page.url.searchParams.get("numPlayers") ?? "", 2);
     type ActiveCell = {
         type: Color;
@@ -72,45 +75,43 @@
     };
     type Cell = { type: "empty"; opacity: Property } | ActiveCell;
     let grid: Cell[][] = $state([]);
-    let next: Color = new Color(1);
-    let turn: Color = $state(new Color(0));
+    let next: Color = new Color(NUM_PLAYERS - 2);
+    let turn: Color = $state(new Color(NUM_PLAYERS - 1));
     let count = $state(0);
     let prevUpdate = performance.now();
     let mouseX: number, mouseY: number;
     let won = $state(false);
     let showWinner = $state(false);
     const players: Player[] = $derived(
-        Array.from(
-            { length: NUM_PLAYERS },
-            (_, i) =>
-                new Player(
-                    i,
-                    grid.reduce(
-                        (acc, row) =>
+        Array.from({ length: NUM_PLAYERS }, (_, i) => {
+            let score = grid.reduce(
+                (acc, row) =>
+                    acc +
+                    row.filter(
+                        (cell) =>
+                            cell.type !== "empty" && cell.type.index === i,
+                    ).length,
+                0,
+            );
+            let active = grid.reduce(
+                (acc, row) =>
+                    acc +
+                    row.reduce(
+                        (acc, cell) =>
                             acc +
-                            row.filter(
-                                (cell) =>
-                                    cell.type !== "empty" &&
-                                    cell.type.index === i,
-                            ).length,
+                            (cell.type !== "empty" && cell.type.index === i
+                                ? cell.points.target
+                                : 0),
                         0,
                     ),
-                    grid.reduce(
-                        (acc, row) =>
-                            acc +
-                            row.reduce(
-                                (acc, cell) =>
-                                    acc +
-                                    (cell.type !== "empty" &&
-                                    cell.type.index === i
-                                        ? cell.points.target
-                                        : 0),
-                                0,
-                            ),
-                        0,
-                    ),
-                ),
-        ),
+                0,
+            );
+            if (count < NUM_PLAYERS) {
+                score = Math.min(score, 1);
+                active = Math.min(active, 3);
+            }
+            return new Player(i, score, active);
+        }),
     );
     const activePlayers = $derived(
         players.filter((player) => count < NUM_PLAYERS || player.score > 0),
@@ -147,12 +148,23 @@
         }
     });
 
-    $effect(() => {
-        if (GRID_SIZE % 2 === 1 && count === NUM_PLAYERS)
-            grid[Math.floor(GRID_SIZE / 2)][
-                Math.floor(GRID_SIZE / 2)
-            ].opacity.target = 1; // open center after initial round
-    });
+    // $effect(() => {
+    //     if (GRID_SIZE % 2 === 1 && count === NUM_PLAYERS) {
+    //         grid[Math.floor(GRID_SIZE / 2)][
+    //             Math.floor(GRID_SIZE / 2)
+    //         ].opacity.target = 1; // open center after initial round
+    //         grid.forEach((row, i) => {
+    //             row.forEach((cell, j) => {
+    //                 if (cell.opacity.target === 0.5) {
+    //                     cell.opacity.target = 0;
+    //                     setTimeout(() => {
+    //                         grid[i][j] = newCell({ type: "empty" });
+    //                     }, 300);
+    //                 }
+    //             });
+    //         });
+    //     }
+    // });
 
     $effect(() => {
         if (won) {
@@ -216,9 +228,21 @@
                         if (cell.type === "empty") {
                             grid[row][col] = newCell({
                                 type: current,
-                                points: 4,
+                                points: 3,
                             });
-                            setTimeout(solveGrid, 300);
+                            if (col + 1 < GRID_SIZE) {
+                                upgradeGhost(row, col + 1, current);
+                            }
+                            if (row + 1 < GRID_SIZE) {
+                                upgradeGhost(row + 1, col, current);
+                            }
+                            if (row - 1 >= 0) {
+                                upgradeGhost(row - 1, col, current);
+                            }
+                            if (col - 1 >= 0) {
+                                upgradeGhost(row, col - 1, current);
+                            }
+                            nextTurn();
                             break;
                         }
                         cell.points.target++;
@@ -301,14 +325,49 @@
     }
 
     function nextTurn() {
-        setTimeout(() => {
-            do {
-                turn = next;
-                next = new Color((turn.index + 1) % NUM_PLAYERS);
-            } while (players[turn.index].score === 0 && count >= NUM_PLAYERS);
-            count++;
-            grid = [...grid];
-        }, 300);
+        setTimeout(
+            () => {
+                if (count + 1 === NUM_PLAYERS) {
+                    // refill center if necessary
+                    if (
+                        grid[Math.floor(GRID_SIZE / 2)][
+                            Math.floor(GRID_SIZE / 2)
+                        ].type === "empty"
+                    ) {
+                        grid[Math.floor(GRID_SIZE / 2)][
+                            Math.floor(GRID_SIZE / 2)
+                        ].opacity.target = 1;
+                    }
+                    // delete ghost cells
+                    grid.forEach((row, i) =>
+                        row.forEach((cell, j) => {
+                            if (cell.opacity.target === 0.5) {
+                                cell.opacity.target = 0;
+                                setTimeout(() => {
+                                    grid[i][j] = newCell({ type: "empty" });
+                                }, 300);
+                            }
+                        }),
+                    );
+                }
+                setTimeout(() => {
+                    do {
+                        turn = next;
+                        if (count >= NUM_PLAYERS - 1)
+                            next = new Color((turn.index + 1) % NUM_PLAYERS);
+                        else if (count === NUM_PLAYERS - 2)
+                            next = new Color(turn.index); // repeat turn
+                        else next = new Color(turn.index - 1); // reverse order
+                    } while (
+                        players[turn.index].score === 0 &&
+                        count >= NUM_PLAYERS
+                    );
+                    count++;
+                    grid = [...grid];
+                }, 300);
+            },
+            count + 1 === NUM_PLAYERS ? 500 : 0,
+        );
     }
 
     function render() {
@@ -337,6 +396,7 @@
             for (let col = 0; col < GRID_SIZE; col++) {
                 let cell = grid[row][col];
                 if (cell.type === "empty") continue;
+                if (cell.opacity.target < 1) continue;
                 let tlx = col * CELL_SIZE + BORDER_SIZE;
                 let tly = row * CELL_SIZE + BORDER_SIZE;
                 let brx = tlx + CELL_SIZE - BORDER_SIZE;
@@ -354,9 +414,10 @@
                         cell.type.index === turn.index &&
                         cell.offset.target !== 0
                     )
-                        cell.offset.target = event.buttons & 1 ? 2 : 8;
+                        cell.offset.target =
+                            event.buttons & 1 ? CELL_PRESSED : CELL_HOVER;
                 } else {
-                    cell.offset.target = 5;
+                    cell.offset.target = CELL_OFFSET;
                 }
             }
         }
@@ -369,11 +430,25 @@
                 type: color,
                 points: new Points(1),
                 opacity: new Property(1),
-                offset: new Property(4),
+                offset: new Property(5),
             };
         } else {
             cell.type = color;
             if (cell.points.target < 4) cell.points.target += 1;
+        }
+    }
+
+    function upgradeGhost(row: number, col: number, color: Color) {
+        let cell = grid[row][col];
+        if (cell.type === "empty") {
+            grid[row][col] = {
+                type: color,
+                points: new Points(1),
+                opacity: new Property(0.5),
+                offset: new Property(0),
+            };
+        } else {
+            cell.points.target += 1;
         }
     }
 
@@ -404,6 +479,7 @@
                     CELL_SIZE - BORDER_SIZE,
                     CORNER_RADIUS,
                 );
+                ctx.fill();
 
                 // Draw cell highlight
                 ctx.fillStyle = "#c7b7a6" + opacity;
@@ -440,8 +516,7 @@
             for (let col = 0; col < GRID_SIZE; col++) {
                 let cell = grid[row][col];
                 if (cell.type === "empty") continue;
-                cell.opacity.target = 1; // prevent fading issues
-                cell.offset.target = 5; // prevent flying squares
+                cell.offset.target = CELL_OFFSET; // prevent flying squares
                 if (cell.points.target < 4) continue;
                 solved = false;
                 // Explode cell
@@ -482,7 +557,7 @@
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
                 if (grid[row][col].type === "empty") continue;
-                drawSquare(
+                drawCell(
                     col * CELL_SIZE + BORDER_SIZE,
                     row * CELL_SIZE + BORDER_SIZE,
                     CELL_SIZE - BORDER_SIZE,
@@ -492,24 +567,39 @@
         }
     }
 
-    function drawSquare(x: number, y: number, size: number, cell: ActiveCell) {
+    function drawCell(x: number, y: number, size: number, cell: ActiveCell) {
         ctx.save();
-        // Render shadow
-        ctx.fillStyle = cell.type.opacity(cell.opacity.value).shadow;
-        ctx.beginPath();
-        ctx.roundRect(x, y + 1.5, size, size, CORNER_RADIUS);
-        ctx.fill();
+        if (cell.offset.value > 0) {
+            // Render shadow
+            ctx.fillStyle = cell.type.opacity(cell.opacity.value).shadow;
+            ctx.beginPath();
+            ctx.roundRect(x, y + 1.5, size, size, CORNER_RADIUS);
+            ctx.fill();
+        }
         // Render square
         ctx.fillStyle = cell.type.opacity(cell.opacity.value).primary;
         ctx.beginPath();
-        ctx.roundRect(x, y - cell.offset.value, size, size, CORNER_RADIUS);
+        ctx.roundRect(
+            x,
+            y - cell.offset.value,
+            size,
+            size + 1.5,
+            CORNER_RADIUS,
+        );
         ctx.clip();
         ctx.fill();
         // Render dots
         let points: Array<{ x: number; y: number; opacity: number }> = [];
         let centerX = (2 * x + size) / 2;
         let centerY = (2 * y + size) / 2 - cell.offset.value;
-        if (cell.points.value <= 2) {
+        if (cell.points.value < 1) {
+            // 1 circle preview
+            points.push({
+                x: centerX,
+                y: centerY,
+                opacity: 1,
+            });
+        } else if (cell.points.value <= 2) {
             // 1-2 circles
             points.push({
                 x: centerX + SPREAD_RADIUS * (cell.points.value - 1),
