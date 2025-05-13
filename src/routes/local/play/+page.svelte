@@ -72,8 +72,8 @@
     };
     type Cell = { type: "empty"; opacity: Property } | ActiveCell;
     let grid: Cell[][] = $state([]);
-    let next: Color = new Color(NUM_PLAYERS - 2);
-    let turn: Color = $state(new Color(NUM_PLAYERS - 1));
+    let next: Color = new Color(1);
+    let turn: Color = $state(new Color(0));
     let count = $state(0);
     let prevUpdate = performance.now();
     let mouseX: number, mouseY: number;
@@ -199,9 +199,7 @@
                 for (let col = 0; col < GRID_SIZE; col++) {
                     let cell = grid[row][col];
                     if (current.index < 0) continue; // waiting state
-                    if (count >= NUM_PLAYERS && cell.type === "empty")
-                        // dont click empty cells
-                        continue;
+                    if (count >= NUM_PLAYERS && cell.type === "empty") continue;
                     if (
                         cell.type !== "empty" &&
                         cell.type.index !== current.index
@@ -218,9 +216,9 @@
                         if (cell.type === "empty") {
                             grid[row][col] = newCell({
                                 type: current,
-                                points: 3,
+                                points: 4,
                             });
-                            nextTurn();
+                            setTimeout(solveGrid, 300);
                             break;
                         }
                         cell.points.target++;
@@ -306,14 +304,7 @@
         setTimeout(() => {
             do {
                 turn = next;
-                if (count >= NUM_PLAYERS - 1)
-                    // regular turn order
-                    next = new Color((turn.index + 1) % NUM_PLAYERS);
-                else if (count === NUM_PLAYERS - 2) {
-                    // repeat turn
-                    next = new Color(turn.index);
-                    // make center accessible
-                } else next = new Color(turn.index - 1); // reverse order
+                next = new Color((turn.index + 1) % NUM_PLAYERS);
             } while (players[turn.index].score === 0 && count >= NUM_PLAYERS);
             count++;
             grid = [...grid];
