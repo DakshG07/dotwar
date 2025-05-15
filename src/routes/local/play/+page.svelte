@@ -148,24 +148,6 @@
         }
     });
 
-    // $effect(() => {
-    //     if (GRID_SIZE % 2 === 1 && count === NUM_PLAYERS) {
-    //         grid[Math.floor(GRID_SIZE / 2)][
-    //             Math.floor(GRID_SIZE / 2)
-    //         ].opacity.target = 1; // open center after initial round
-    //         grid.forEach((row, i) => {
-    //             row.forEach((cell, j) => {
-    //                 if (cell.opacity.target === 0.5) {
-    //                     cell.opacity.target = 0;
-    //                     setTimeout(() => {
-    //                         grid[i][j] = newCell({ type: "empty" });
-    //                     }, 300);
-    //                 }
-    //             });
-    //         });
-    //     }
-    // });
-
     $effect(() => {
         if (won) {
             canvas.style.transform = "scale(0.75)";
@@ -294,17 +276,9 @@
     function resetGrid() {
         if (grid.length === 0)
             grid = Array.from({ length: GRID_SIZE }, (_, i) =>
-                Array.from({ length: GRID_SIZE }, (_, j) => {
-                    if (
-                        GRID_SIZE % 2 === 1 &&
-                        i === Math.floor(GRID_SIZE / 2) &&
-                        j === Math.floor(GRID_SIZE / 2)
-                    )
-                        return {
-                            type: "empty",
-                            opacity: new Property(0, true),
-                        };
-                    return { type: "empty", opacity: new Property(1, true) };
+                Array(GRID_SIZE).fill({
+                    type: "empty",
+                    opacity: new Property(1, true),
                 }),
             );
         else
@@ -314,12 +288,6 @@
                         type: "empty",
                         opacity: new Property(1, true),
                     };
-                    if (
-                        GRID_SIZE % 2 === 1 &&
-                        i === Math.floor(GRID_SIZE / 2) &&
-                        j === Math.floor(GRID_SIZE / 2)
-                    )
-                        grid[i][j].opacity.target = 0;
                 }),
             );
     }
@@ -328,16 +296,6 @@
         setTimeout(
             () => {
                 if (count + 1 === NUM_PLAYERS) {
-                    // refill center if necessary
-                    if (
-                        grid[Math.floor(GRID_SIZE / 2)][
-                            Math.floor(GRID_SIZE / 2)
-                        ].type === "empty"
-                    ) {
-                        grid[Math.floor(GRID_SIZE / 2)][
-                            Math.floor(GRID_SIZE / 2)
-                        ].opacity.target = 1;
-                    }
                     // delete ghost cells
                     grid.forEach((row, i) =>
                         row.forEach((cell, j) => {
